@@ -123,6 +123,7 @@ Java_com_example_l_mobilefacenet_Face_FaceDetect(JNIEnv *env, jobject instance,
     //  LOGD("内部人脸检测完成,开始导出数据");
     int *faceInfo = new int[out_size];
     faceInfo[0] = num_face;
+    // faceInfo: leftEye:[5, 10] rightEye:[6, 11] nose:[7, 12] leftLip:[8, 13] rightLip:[9, 14]
     for (int i = 0; i < num_face; i++) {
         faceInfo[14 * i + 1] = finalBbox[i].x1;//left
         faceInfo[14 * i + 2] = finalBbox[i].y1;//top
@@ -161,15 +162,15 @@ Java_com_example_l_mobilefacenet_Face_FaceModelUnInit(JNIEnv *env, jobject insta
 extern "C"
 JNIEXPORT jdouble JNICALL
 Java_com_example_l_mobilefacenet_Face_FaceRecognize(JNIEnv *env, jobject instance,
-                                                    jbyteArray faceDate1_, jint w1, jint h1,
-                                                    jbyteArray faceDate2_, jint w2, jint h2) {
-    jbyte *faceDate1 = env->GetByteArrayElements(faceDate1_, NULL);
-    jbyte *faceDate2 = env->GetByteArrayElements(faceDate2_, NULL);
+                                                    jbyteArray faceData1_, jint w1, jint h1,
+                                                    jbyteArray faceData2_, jint w2, jint h2) {
+    jbyte *faceData1 = env->GetByteArrayElements(faceData1_, NULL);
+    jbyte *faceData2 = env->GetByteArrayElements(faceData2_, NULL);
 
     // TODO
     double similar=0;
-    unsigned char *faceImageCharDate1 = (unsigned char*)faceDate1;
-    unsigned char *faceImageCharDate2 = (unsigned char*)faceDate2;
+    unsigned char *faceImageCharDate1 = (unsigned char*)faceData1;
+    unsigned char *faceImageCharDate2 = (unsigned char*)faceData2;
 
     //没进行对齐操作，且以下对图像缩放的操作方法对结果影响较大。可改进空间很大，有能力的自己改改
     ncnn::Mat ncnn_img1 = ncnn::Mat::from_pixels_resize(faceImageCharDate1, ncnn::Mat::PIXEL_RGBA2RGB, w1, h1,112,112);
@@ -178,8 +179,8 @@ Java_com_example_l_mobilefacenet_Face_FaceRecognize(JNIEnv *env, jobject instanc
     mRecognize->start(ncnn_img1, feature1);
     mRecognize->start(ncnn_img2, feature2);
 
-    env->ReleaseByteArrayElements(faceDate1_, faceDate1, 0);
-    env->ReleaseByteArrayElements(faceDate2_, faceDate2, 0);
+    env->ReleaseByteArrayElements(faceData1_, faceData1, 0);
+    env->ReleaseByteArrayElements(faceData2_, faceData2, 0);
     similar=calculSimilar(feature1, feature2);
     return similar;
 }

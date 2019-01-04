@@ -19,6 +19,11 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import org.opencv.android.Utils;
+import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.opencv.imgproc.Imgproc;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -29,16 +34,22 @@ import java.nio.ByteBuffer;
 import static android.content.ContentValues.TAG;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int SELECT_IMAGE1 = 1,SELECT_IMAGE2 = 2;
-    private ImageView imageView1,imageView2;
-    private Bitmap yourSelectedImage1 = null,yourSelectedImage2 = null;
-    private Bitmap faceImage1 = null,faceImage2 = null;
-    TextView faceInfo1,faceInfo2,cmpResult;
+    static {
+        System.loadLibrary("opencv_java3");
+    }
+
+    private static final int SELECT_IMAGE1 = 1, SELECT_IMAGE2 = 2;
+    private ImageView imageView1, imageView2;
+    private Bitmap yourSelectedImage1 = null, yourSelectedImage2 = null;
+    private Bitmap  faceImage1 = null, faceImage2 = null;
+    private byte[] faceData1;
+    private byte[] faceData2;
+    TextView faceInfo1, faceInfo2, cmpResult;
     private Face mFace = new Face();
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS_STORAGE = {
             "android.permission.READ_EXTERNAL_STORAGE",
-            "android.permission.WRITE_EXTERNAL_STORAGE" };
+            "android.permission.WRITE_EXTERNAL_STORAGE"};
 
     public static void verifyStoragePermissions(Activity activity) {
 
@@ -48,7 +59,7 @@ public class MainActivity extends AppCompatActivity {
                     "android.permission.WRITE_EXTERNAL_STORAGE");
             if (permission != PackageManager.PERMISSION_GRANTED) {
                 // 没有写的权限，去申请写的权限，会弹出对话框
-                ActivityCompat.requestPermissions(activity, PERMISSIONS_STORAGE,REQUEST_EXTERNAL_STORAGE);
+                ActivityCompat.requestPermissions(activity, PERMISSIONS_STORAGE, REQUEST_EXTERNAL_STORAGE);
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -80,7 +91,7 @@ public class MainActivity extends AppCompatActivity {
 
         //LEFT IMAGE
         imageView1 = (ImageView) findViewById(R.id.imageView1);
-        faceInfo1=(TextView)findViewById(R.id.faceInfo1);
+        faceInfo1 = (TextView) findViewById(R.id.faceInfo1);
         Button buttonImage1 = (Button) findViewById(R.id.select1);
         buttonImage1.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -97,37 +108,50 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View arg0) {
                 if (yourSelectedImage1 == null)
                     return;
-                faceImage1=null;
+                faceImage1 = null;
                 //detect
                 int width = yourSelectedImage1.getWidth();
                 int height = yourSelectedImage1.getHeight();
                 byte[] imageDate = getPixelsRGBA(yourSelectedImage1);
 
                 long timeDetectFace = System.currentTimeMillis();
-                int faceInfo[]=mFace.FaceDetect(imageDate,width,height,4);
+                int faceInfo[] = mFace.FaceDetect(imageDate, width, height, 4);
                 timeDetectFace = System.currentTimeMillis() - timeDetectFace;
 
-                if(faceInfo.length>1){
-                    faceInfo1.setText("pic1 detect time:"+timeDetectFace);
+                if (faceInfo.length > 1) {
+                    faceInfo1.setText("pic1 detect time:" + timeDetectFace);
                     int faceNum = faceInfo[0];
-                    Log.i(TAG, "pic width："+width+"height："+height+" face num：" + faceNum );
+                    Log.i(TAG, "pic width：" + width + "height：" + height + " face num：" + faceNum);
                     Bitmap drawBitmap = yourSelectedImage1.copy(Bitmap.Config.ARGB_8888, true);
-                    for(int i=0;i<faceInfo[0];i++) {
+                    for (int i = 0; i < faceInfo[0]; i++) {
                         int left, top, right, bottom;
                         Canvas canvas = new Canvas(drawBitmap);
                         Paint paint = new Paint();
-                        left = faceInfo[1+14*i];
-                        top = faceInfo[2+14*i];
-                        right = faceInfo[3+14*i];
-                        bottom = faceInfo[4+14*i];
+                        left = faceInfo[1 + 14 * i];
+                        top = faceInfo[2 + 14 * i];
+                        right = faceInfo[3 + 14 * i];
+                        bottom = faceInfo[4 + 14 * i];
                         paint.setColor(Color.BLUE);
                         paint.setStyle(Paint.Style.STROKE);
                         paint.setStrokeWidth(5);
                         canvas.drawRect(left, top, right, bottom, paint);
                     }
                     imageView1.setImageBitmap(drawBitmap);
-                    faceImage1 = Bitmap.createBitmap(yourSelectedImage1,faceInfo[1],faceInfo[2],faceInfo[3]-faceInfo[1],faceInfo[4]-faceInfo[2]);
-                }else{
+
+                    int widthEnlarge = (int)((faceInfo[3] - faceInfo[1]) / 4);
+                    int heightEnlarge = (int)((faceInfo[4] - faceInfo[2]) / 4);
+                    int left = (faceInfo[1] > widthEnlarge) ? (faceInfo[1] - widthEnlarge) : 0;
+                    int top = (faceInfo[2] > heightEnlarge) ? (faceInfo[2] - heightEnlarge) : 0;
+                    int right = ((faceInfo[3] + widthEnlarge) < width) ? (faceInfo[3] + widthEnlarge) : width;
+                    int bottom = ((faceInfo[4] + heightEnlarge) < height) ? (faceInfo[4] + heightEnlarge) : height;
+
+                    faceImage1 = Bitmap.createBitmap(yourSelectedImage1, left, top, right - left, bottom - top);
+                    faceImage1 = getWarpAffineBitmap(faceImage1, new Point(faceInfo[5], faceInfo[10]), new Point(faceInfo[6], faceInfo[11]));
+                    faceData1 = getPixelsRGBA(faceImage1);
+                    int[] faceInfo3 = mFace.FaceDetect(faceData1, right - left, bottom - top, 4);
+                    faceImage1 = Bitmap.createBitmap(faceImage1, faceInfo3[1], faceInfo3[2], faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
+                    faceData1 = getPixelsRGBA(faceImage1);
+                } else {
                     faceInfo1.setText("no face");
                 }
             }
@@ -135,7 +159,7 @@ public class MainActivity extends AppCompatActivity {
 
         //RIGHT IMAGE
         imageView2 = (ImageView) findViewById(R.id.imageView2);
-        faceInfo2=(TextView)findViewById(R.id.faceInfo2);
+        faceInfo2 = (TextView) findViewById(R.id.faceInfo2);
         Button buttonImage2 = (Button) findViewById(R.id.select2);
         buttonImage2.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -153,36 +177,61 @@ public class MainActivity extends AppCompatActivity {
                 if (yourSelectedImage2 == null)
                     return;
                 //detect
-                faceImage2=null;
+                faceImage2 = null;
                 int width = yourSelectedImage2.getWidth();
                 int height = yourSelectedImage2.getHeight();
                 byte[] imageDate = getPixelsRGBA(yourSelectedImage2);
 
                 long timeDetectFace = System.currentTimeMillis();
-                int faceInfo[]=mFace.FaceDetect(imageDate,width,height,4);
+                int faceInfo[] = mFace.FaceDetect(imageDate, width, height, 4);
                 timeDetectFace = System.currentTimeMillis() - timeDetectFace;
 
-                if(faceInfo.length>1){
-                    faceInfo2.setText("pic2 detect time:"+timeDetectFace);
+                if (faceInfo.length > 1) {
+                    faceInfo2.setText("pic2 detect time:" + timeDetectFace);
                     int faceNum = faceInfo[0];
-                    Log.i(TAG, "pic width："+width+"height："+height+" face num：" + faceNum );
+                    Log.i(TAG, "pic width：" + width + "height：" + height + " face num：" + faceNum);
                     Bitmap drawBitmap = yourSelectedImage2.copy(Bitmap.Config.ARGB_8888, true);
-                    for(int i=0;i<faceInfo[0];i++) {
+                    for (int i = 0; i < faceInfo[0]; i++) {
                         int left, top, right, bottom;
                         Canvas canvas = new Canvas(drawBitmap);
                         Paint paint = new Paint();
-                        left = faceInfo[1+14*i];
-                        top = faceInfo[2+14*i];
-                        right = faceInfo[3+14*i];
-                        bottom = faceInfo[4+14*i];
+                        left = faceInfo[1 + 14 * i];
+                        top = faceInfo[2 + 14 * i];
+                        right = faceInfo[3 + 14 * i];
+                        bottom = faceInfo[4 + 14 * i];
                         paint.setColor(Color.GREEN);
                         paint.setStyle(Paint.Style.STROKE);
-                        paint.setStrokeWidth(5);
+                        paint.setStrokeWidth(3);
+                        paint.setTextSize(25);
                         canvas.drawRect(left, top, right, bottom, paint);
+
+                        int widthEnlarge = (int)((right - left) / 4);
+                        int heightEnlarge = (int)((bottom - top) / 4);
+                        int left_ = (left > widthEnlarge) ? (left - widthEnlarge) : 0;
+                        int top_ = (top > heightEnlarge) ? (top - heightEnlarge) : 0;
+                        int right_ = ((right + widthEnlarge) < width) ? (right + widthEnlarge) : width;
+                        int bottom_ = ((bottom + heightEnlarge) < height) ? (bottom + heightEnlarge) : height;
+
+                        faceImage2 = Bitmap.createBitmap(yourSelectedImage2, left_, top_, right_ - left_, bottom_ - top_);
+                        faceImage2 = getWarpAffineBitmap(faceImage2, new Point(faceInfo[5+14*i]-left_, faceInfo[10+14*i]-top_), new Point(faceInfo[6+14*i]-left_, faceInfo[11+14*i]-top_));
+                        faceData2 = getPixelsRGBA(faceImage2);
+                        int[] faceInfo4 = mFace.FaceDetect(faceData2, right_ - left_, bottom_ - top_, 4);
+                        if (faceInfo4.length == 1) {
+                            continue;
+                        }
+                        faceImage2 = Bitmap.createBitmap(faceImage2, faceInfo4[1], faceInfo4[2],
+                                faceInfo4[3] - faceInfo4[1], faceInfo4[4] - faceInfo4[2]);
+                        faceData2 = getPixelsRGBA(faceImage2);
+//                        faceImage2 = Bitmap.createBitmap(yourSelectedImage2, faceInfo[1+14*i], faceInfo[2+14*i], faceInfo[3+14*i] - faceInfo[1+14*i], faceInfo[4+14*i] - faceInfo[2+14*i]);
+//                        faceImage2 = getWarpAffineBitmap(faceImage2, new Point(faceInfo[5+14*i], faceInfo[10+14*i]), new Point(faceInfo[6+14*i], faceInfo[11+14*i]));
+//                        faceData2 = getPixelsRGBA(faceImage2);
+                        double similar = mFace.FaceRecognize(faceData1, faceImage1.getWidth(), faceImage1.getHeight(),
+                                faceData2, faceImage2.getWidth(), faceImage2.getHeight());
+                        canvas.drawText(Double.toString(similar), left, top - 5, paint);
                     }
                     imageView2.setImageBitmap(drawBitmap);
-                    faceImage2 = Bitmap.createBitmap(yourSelectedImage2,faceInfo[1],faceInfo[2],faceInfo[3]-faceInfo[1],faceInfo[4]-faceInfo[2]);
-                }else{
+
+                } else {
                     faceInfo2.setText("no face");
                 }
 
@@ -190,22 +239,22 @@ public class MainActivity extends AppCompatActivity {
         });
 
         //cmp
-        cmpResult=(TextView)findViewById(R.id.textView1);
+        cmpResult = (TextView) findViewById(R.id.textView1);
         Button cmpImage = (Button) findViewById(R.id.facecmp);
         cmpImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View arg0) {
-                if (faceImage1 == null||faceImage2 == null){
+                if (faceImage1 == null || faceImage2 == null) {
                     cmpResult.setText("no enough face,return");
                     return;
                 }
                 byte[] faceDate1 = getPixelsRGBA(faceImage1);
                 byte[] faceDate2 = getPixelsRGBA(faceImage2);
                 long timeRecognizeFace = System.currentTimeMillis();
-                double similar=mFace.FaceRecognize(faceDate1,faceImage1.getWidth(),faceImage1.getHeight(),
-                        faceDate2,faceImage2.getWidth(),faceImage2.getHeight());
+                double similar = mFace.FaceRecognize(faceDate1, faceImage1.getWidth(), faceImage1.getHeight(),
+                        faceDate2, faceImage2.getWidth(), faceImage2.getHeight());
                 timeRecognizeFace = System.currentTimeMillis() - timeRecognizeFace;
-                cmpResult.setText("cosin:"+similar+"\n"+"cmp time:"+timeRecognizeFace);
+                cmpResult.setText("cosin:" + similar + "\n" + "cmp time:" + timeRecognizeFace);
             }
         });
 
@@ -224,8 +273,7 @@ public class MainActivity extends AppCompatActivity {
                     Bitmap rgba = bitmap.copy(Bitmap.Config.ARGB_8888, true);
                     yourSelectedImage1 = rgba;
                     imageView1.setImageBitmap(yourSelectedImage1);
-                }
-                else if (requestCode == SELECT_IMAGE2) {
+                } else if (requestCode == SELECT_IMAGE2) {
                     Bitmap bitmap = decodeUri(selectedImage);
                     Bitmap rgba = bitmap.copy(Bitmap.Config.ARGB_8888, true);
                     yourSelectedImage2 = rgba;
@@ -281,19 +329,19 @@ public class MainActivity extends AppCompatActivity {
     private void copyBigDataToSD(String strOutFileName) throws IOException {
         Log.i(TAG, "start copy file " + strOutFileName);
         File sdDir = Environment.getExternalStorageDirectory();//get directory
-        File file = new File(sdDir.toString()+"/facem/");
+        File file = new File(sdDir.toString() + "/facem/");
         if (!file.exists()) {
             file.mkdir();
         }
 
-        String tmpFile = sdDir.toString()+"/facem/" + strOutFileName;
+        String tmpFile = sdDir.toString() + "/facem/" + strOutFileName;
         File f = new File(tmpFile);
         if (f.exists()) {
             Log.i(TAG, "file exists " + strOutFileName);
             return;
         }
         InputStream myInput;
-        java.io.OutputStream myOutput = new FileOutputStream(sdDir.toString()+"/facem/"+ strOutFileName);
+        java.io.OutputStream myOutput = new FileOutputStream(sdDir.toString() + "/facem/" + strOutFileName);
         myInput = this.getAssets().open(strOutFileName);
         byte[] buffer = new byte[1024];
         int length = myInput.read(buffer);
@@ -306,6 +354,35 @@ public class MainActivity extends AppCompatActivity {
         myOutput.close();
         Log.i(TAG, "end copy file " + strOutFileName);
 
+    }
+
+    private Bitmap getWarpAffineBitmap(Bitmap bitmap, Point leftEye, Point rightEye) {
+//        int leftEye_x = info[5];
+//        int leftEye_y = info[10];
+//        int rightEye_x = info[6];
+//        int rightEye_y = info[11];
+
+        double eyeCenter_x = (leftEye.x + rightEye.x) * 0.5;
+        double eyeCenter_y = (leftEye.y + rightEye.y) * 0.5;
+
+        // Calculate the angle between two eyes
+        double dy = rightEye.y - leftEye.y;
+        double dx = rightEye.x - leftEye.x;
+        double angle = Math.atan2(dy, dx) * 180.0 / Math.PI;
+
+        // Calculate the rotate mat form eyeCenter angle and scale. scale = 1.0 means keep the same size
+        Mat rotateMat = Imgproc.getRotationMatrix2D(new Point(eyeCenter_x, eyeCenter_y), angle, 1.0);
+
+        // Convert the origin bitmap to opencv mat
+        Mat imgMat = new Mat();
+        Utils.bitmapToMat(bitmap, imgMat);
+
+        // Affine
+        Mat imgMatAffined = new Mat();
+        Imgproc.warpAffine(imgMat, imgMatAffined, rotateMat, imgMat.size());
+
+        Utils.matToBitmap(imgMatAffined, bitmap);
+        return bitmap;
     }
 
 }
