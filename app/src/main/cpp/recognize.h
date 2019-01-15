@@ -14,6 +14,7 @@ namespace Face {
 		void start(ncnn::Mat& ncnn_img, std::vector<float>&feature128);
 		void SetThreadNum(int threadNum);
 	private:
+		void normalize(std::vector<float>&);
 		void RecogNet(ncnn::Mat& img_);
 		ncnn::Net Recognet;
 		//ncnn::Mat ncnn_img;

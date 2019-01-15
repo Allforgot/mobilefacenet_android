@@ -65,6 +65,19 @@ public class Face {
         return result;
     }
 
+    public double calSimilarity(float[] feature1, float[] feature2) {
+        if (feature1.length == 0 || feature2.length == 0) {
+            return 0;
+        }
+        double ret = 0.0, mod1 = 0.0, mod2 = 0.0;
+        for (int index = 0; index < feature1.length; index ++) {
+            ret += feature1[index] * feature2[index];
+            mod1 += feature1[index] * feature1[index];
+            mod2 += feature2[index] * feature2[index];
+        }
+        return ret / Math.sqrt(mod1) / Math.sqrt(mod2);
+    }
+
     public ArrayList<FaceInfo> faceDetect(Bitmap bitmap) {
         return faceDetect(bitmap, 4);
     }
@@ -84,7 +97,9 @@ public class Face {
 
     public native boolean FaceModelUnInit();
 
-    public native double FaceRecognize(byte[] faceDate1, int w1, int h1, byte[] faceDate2, int w2, int h2);
+    public native float[] GetFaceFeature(byte[] faceData, int width, int height);
+
+    public native double FaceRecognize(byte[] faceData1, int w1, int h1, byte[] faceData2, int w2, int h2);
 
     static {
         System.loadLibrary("Face");
