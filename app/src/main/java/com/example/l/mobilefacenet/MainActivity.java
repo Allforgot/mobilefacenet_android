@@ -19,6 +19,8 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import com.emwit.core.Face;
+
 import org.opencv.android.Utils;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -31,6 +33,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 
 import static android.content.ContentValues.TAG;
 import static org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY;
@@ -49,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
     private float[] feature1;
     private float[] feature2;
     TextView faceInfo1, faceInfo2, cmpResult;
+//    private Face mFace = new Face();
     private Face mFace = new Face();
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
     private static String[] PERMISSIONS_STORAGE = {
@@ -91,7 +95,8 @@ public class MainActivity extends AppCompatActivity {
         //model init
         File sdDir = Environment.getExternalStorageDirectory();//get directory
         String sdPath = sdDir.toString() + "/facem/";
-        mFace.FaceModelInit(sdPath);
+//        mFace.FaceModelInit(sdPath);
+        mFace.init(sdPath);
 
         //LEFT IMAGE
         imageView1 = (ImageView) findViewById(R.id.imageView1);
@@ -142,8 +147,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                     imageView1.setImageBitmap(drawBitmap);
 
-                    int widthEnlarge = (int)((faceInfo[3] - faceInfo[1]) / 4);
-                    int heightEnlarge = (int)((faceInfo[4] - faceInfo[2]) / 4);
+                    int widthEnlarge = (int)((faceInfo[3] - faceInfo[1]) / 3);
+                    int heightEnlarge = (int)((faceInfo[4] - faceInfo[2]) / 3);
                     left = (faceInfo[1] > widthEnlarge) ? (faceInfo[1] - widthEnlarge) : 0;
                     top = (faceInfo[2] > heightEnlarge) ? (faceInfo[2] - heightEnlarge) : 0;
                     right = ((faceInfo[3] + widthEnlarge) < width) ? (faceInfo[3] + widthEnlarge) : width;
@@ -156,6 +161,8 @@ public class MainActivity extends AppCompatActivity {
                     faceImage1 = Bitmap.createBitmap(faceImage1, faceInfo3[1], faceInfo3[2], faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
                     faceData1 = getPixelsRGBA(faceImage1);
                     feature1 = mFace.GetFaceFeature(faceData1, faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
+//                    ArrayList<Face.FaceInfo> faceInfos1 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage1);
+//                    feature1 = faceInfos1.get(0).feature128;
                 } else {
                     faceInfo1.setText("no face");
                 }
@@ -205,6 +212,9 @@ public class MainActivity extends AppCompatActivity {
                     int faceNum = faceInfo[0];
                     Log.i(TAG, "pic width：" + width + "height：" + height + " face num：" + faceNum);
                     Bitmap drawBitmap = yourSelectedImage2.copy(Bitmap.Config.ARGB_8888, true);
+
+                    ArrayList<Face.FaceInfo> faceInfos2 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage2);
+
                     for (int i = 0; i < faceInfo[0]; i++) {
                         int left_, top_, right_, bottom_;
                         Canvas canvas = new Canvas(drawBitmap);
@@ -219,8 +229,8 @@ public class MainActivity extends AppCompatActivity {
                         paint.setTextSize(25);
                         canvas.drawRect(left_, top_, right_, bottom_, paint);
 
-                        int widthEnlarge = (int)((faceInfo[3 + 14 * i] - faceInfo[1 + 14 * i]) / 4);
-                        int heightEnlarge = (int)((faceInfo[4 + 14 * i] - faceInfo[2 + 14 * i]) / 4);
+                        int widthEnlarge = (int)((faceInfo[3 + 14 * i] - faceInfo[1 + 14 * i]) / 3);
+                        int heightEnlarge = (int)((faceInfo[4 + 14 * i] - faceInfo[2 + 14 * i]) / 3);
                         left_ = (faceInfo[1 + 14 * i] > widthEnlarge) ? (faceInfo[1 + 14 * i] - widthEnlarge) : 0;
                         top_ = (faceInfo[2 + 14 * i] > heightEnlarge) ? (faceInfo[2 + 14 * i] - heightEnlarge) : 0;
                         right_ = ((faceInfo[3 + 14 * i] + widthEnlarge) < width) ? (faceInfo[3 + 14 * i] + widthEnlarge) : width;
@@ -240,7 +250,8 @@ public class MainActivity extends AppCompatActivity {
 
 //                        double similar = mFace.FaceRecognize(faceData1, faceImage1.getWidth(), faceImage1.getHeight(),
 //                                faceData2, faceImage2.getWidth(), faceImage2.getHeight());
-                        double similar = mFace.calSimilarity(feature1, feature2);
+//                        feature2 = faceInfos2.get(i).feature128;
+                        double similar = mFace.calSimilarityByFeature(feature1, feature2);
                         canvas.drawText(Double.toString(similar), left_, top_ - 5, paint);
                     }
                     imageView2.setImageBitmap(drawBitmap);
@@ -265,10 +276,10 @@ public class MainActivity extends AppCompatActivity {
                 byte[] faceDate1 = getPixelsRGBA(faceImage1);
                 byte[] faceDate2 = getPixelsRGBA(faceImage2);
                 long timeRecognizeFace = System.currentTimeMillis();
-                double similar = mFace.FaceRecognize(faceDate1, faceImage1.getWidth(), faceImage1.getHeight(),
-                        faceDate2, faceImage2.getWidth(), faceImage2.getHeight());
-                timeRecognizeFace = System.currentTimeMillis() - timeRecognizeFace;
-                cmpResult.setText("cosin:" + similar + "\n" + "cmp time:" + timeRecognizeFace);
+//                double similar = mFace.FaceRecognize(faceDate1, faceImage1.getWidth(), faceImage1.getHeight(),
+//                        faceDate2, faceImage2.getWidth(), faceImage2.getHeight());
+//                timeRecognizeFace = System.currentTimeMillis() - timeRecognizeFace;
+//                cmpResult.setText("cosin:" + similar + "\n" + "cmp time:" + timeRecognizeFace);
             }
         });
 
@@ -370,30 +381,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Bitmap getWarpAffineBitmap(Bitmap bitmap, Point leftEye, Point rightEye) {
-//        int leftEye_x = info[5];
-//        int leftEye_y = info[10];
-//        int rightEye_x = info[6];
-//        int rightEye_y = info[11];
-
         double eyeCenter_x = (leftEye.x + rightEye.x) * 0.5;
         double eyeCenter_y = (leftEye.y + rightEye.y) * 0.5;
 
         // Calculate the angle between two eyes
         double dy = rightEye.y - leftEye.y;
         double dx = rightEye.x - leftEye.x;
-        double angle = Math.atan2(dy, dx) * 180.0 / Math.PI;
+        double angleBetweenTwoEyes = Math.atan2(dy, dx) * 180.0 / Math.PI;
 
         // Calculate the rotate mat form eyeCenter angle and scale. scale = 1.0 means keep the same size
-        Mat rotateMat = Imgproc.getRotationMatrix2D(new Point(eyeCenter_x, eyeCenter_y), angle, 1.0);
-
-        // Convert the origin bitmap to opencv mat
+        Mat rotateMat = Imgproc.getRotationMatrix2D(new Point(eyeCenter_x, eyeCenter_y), angleBetweenTwoEyes, 1.0);
         Mat imgMat = new Mat();
         Utils.bitmapToMat(bitmap, imgMat);
 
         // Affine
         Mat imgMatAffined = new Mat();
         Imgproc.warpAffine(imgMat, imgMatAffined, rotateMat, imgMat.size());
-
         Utils.matToBitmap(imgMatAffined, bitmap);
         return bitmap;
     }
