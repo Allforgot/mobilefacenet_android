@@ -1,15 +1,24 @@
 package com.emwit.core;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.graphics.Rect;
+import android.os.Environment;
+import android.util.Log;
 
 import org.opencv.android.Utils;
 import org.opencv.core.Mat;
 import org.opencv.imgproc.Imgproc;
 
-import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import static android.content.ContentValues.TAG;
 
 public class Face {
     static {
@@ -30,19 +39,6 @@ public class Face {
         }
     }
 
-    private class FaceLandmark {
-        public Rect faceRect;
-        public ArrayList<Point> landmarks;
-
-        public void setFaceRect(Rect faceRect) {
-            this.faceRect = faceRect;
-        }
-
-        public void setLandmarks(ArrayList<Point> landmarks) {
-            this.landmarks = landmarks;
-        }
-    }
-
     public boolean init(String modelPath) {
         return FaceModelInit(modelPath);
     }
@@ -51,59 +47,85 @@ public class Face {
         if (imageBitmap == null) {
             return null;
         }
-        ArrayList<FaceLandmark> faceLandmarks = detectFaceFrom(imageBitmap);
+        int[] faceLandmarks = detectFaceFrom(imageBitmap);
+        if (faceLandmarks == null) {
+            return null;
+        }
         ArrayList<FaceInfo> faceInfos = extractFeature(imageBitmap, faceLandmarks);
         return faceInfos;
     }
 
-    private ArrayList<FaceLandmark> detectFaceFrom(Bitmap imageBitmap) {
-        ArrayList<FaceLandmark> result = new ArrayList<>();
-        byte[] imageByteArray = bitmapToByteArray(imageBitmap);
+    private int[] detectFaceFrom(Bitmap imageBitmap) {
+//        ArrayList<FaceLandmark> result = new ArrayList<>();
+        byte[] imageByteArray = getPixelsRGBA(imageBitmap);
         int[] faceRectAndLandmark = FaceDetect(imageByteArray, imageBitmap.getWidth(), imageBitmap.getHeight(), 4);
-        int faceNumber = faceRectAndLandmark[0];
-        for (int i = 0; i < faceNumber; i++) {
-            int left = faceRectAndLandmark[1 + 14 * i];
-            int top = faceRectAndLandmark[2 + 14 * i];
-            int right = faceRectAndLandmark[3 + 14 * i];
-            int bottom = faceRectAndLandmark[4 + 14 * i];
-            Rect rect = new Rect(left, top, right, bottom);
-            ArrayList<Point> points = new ArrayList<>();
-            for (int j = 0; j < 5; j++) {
-                points.add(new Point(faceRectAndLandmark[j + 5 + 14 * i], faceRectAndLandmark[j + 10 + 14 * i]));
-            }
-            FaceLandmark faceRegion = new FaceLandmark();
-            faceRegion.setFaceRect(rect);
-            faceRegion.setLandmarks(points);
-            result.add(faceRegion);
-        }
-        return result;
+        return faceRectAndLandmark;
+//        if (faceRectAndLandmark.length == 0) {
+//            return null;
+//        }
+//        int faceNumber = faceRectAndLandmark[0];
+//        for (int i = 0; i < faceNumber; i++) {
+//            int left = faceRectAndLandmark[1 + 14 * i];
+//            int top = faceRectAndLandmark[2 + 14 * i];
+//            int right = faceRectAndLandmark[3 + 14 * i];
+//            int bottom = faceRectAndLandmark[4 + 14 * i];
+//            Rect rect = new Rect(left, top, right, bottom);
+//            ArrayList<Point> points = new ArrayList<>();
+//            for (int j = 0; j < 5; j++) {
+//                points.add(new Point(faceRectAndLandmark[j + 5 + 14 * i], faceRectAndLandmark[j + 10 + 14 * i]));
+//            }
+//            FaceLandmark faceRegion = new FaceLandmark();
+//            faceRegion.setFaceRect(rect);
+//            faceRegion.setLandmarks(points);
+//            result.add(faceRegion);
+//        }
+//        return result;
     }
 
-    private byte[] bitmapToByteArray(Bitmap imageBitmap) {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        imageBitmap.compress(Bitmap.CompressFormat.PNG, 100, baos);
-        return baos.toByteArray();
+    private byte[] getPixelsRGBA(Bitmap image) {
+        int bytes = image.getByteCount();
+        ByteBuffer buffer = ByteBuffer.allocate(bytes);
+        image.copyPixelsToBuffer(buffer);
+        byte[] temp = buffer.array();
+        return temp;
     }
 
-    private ArrayList<FaceInfo> extractFeature(Bitmap imageBitmap, ArrayList<FaceLandmark> faceLandmarks) {
+    private ArrayList<FaceInfo> extractFeature(Bitmap imageBitmap, int[] faceLandmarks) {
         ArrayList<FaceInfo> faceInfos = new ArrayList<>();
-        for (FaceLandmark faceLandmark : faceLandmarks) {
+        Bitmap bitmapTemp = Bitmap.createBitmap(imageBitmap, 0, 0, imageBitmap.getWidth(), imageBitmap.getHeight());
+        int faceNumber = faceLandmarks[0];
+        for (int index = 0; index < faceNumber; index ++) {
             FaceInfo faceInfo = new FaceInfo();
-            faceInfo.setFaceRect(faceLandmark.faceRect);
-            Point leftEyePoint = faceLandmark.landmarks.get(0);
-            Point rightEyePoint = faceLandmark.landmarks.get(1);
-            Bitmap bitmapTemp = enlargeBitmapForWarpAffine(imageBitmap, faceLandmark.faceRect);
+            int left = faceLandmarks[1 + 14 * index];
+            int top = faceLandmarks[2 + 14 * index];
+            int right = faceLandmarks[3 + 14 * index];
+            int bottom = faceLandmarks[4 + 14 * index];
+            faceInfo.setFaceRect(new Rect(left, top, right, bottom));
+            Point leftEyePoint = new Point(faceLandmarks[5 + 14 * index]-left, faceLandmarks[10 + 14 * index]-top);
+            Point rightEyePoint = new Point(faceLandmarks[6 + 14 * index]-left, faceLandmarks[11 + 14 * index]-top);
+            bitmapTemp = enlargeBitmapForWarpAffine(imageBitmap, faceInfo.faceRect);
             bitmapTemp = warpAffineBitmap(bitmapTemp, leftEyePoint, rightEyePoint);
-            FaceLandmark newFaceLandmark = detectFaceFrom(bitmapTemp).get(0);
-            int newLeft = newFaceLandmark.faceRect.left;
-            int newTop = newFaceLandmark.faceRect.top;
-            int newWidth = newFaceLandmark.faceRect.right - newFaceLandmark.faceRect.left;
-            int newHeight = newFaceLandmark.faceRect.bottom - newFaceLandmark.faceRect.top;
-            bitmapTemp = Bitmap.createBitmap(bitmapTemp, newLeft, newTop, newWidth, newHeight);
-            byte[] byteDataForFeatureExtract = bitmapToByteArray(bitmapTemp);
-            float[] faceFeatures = GetFaceFeature(byteDataForFeatureExtract, bitmapTemp.getWidth(), bitmapTemp.getHeight());
+            int[] newFaceLandmark = detectFaceFrom(bitmapTemp);
+            float[] faceFeatures;
+            if (newFaceLandmark.length > 1) {
+                int newLeft = newFaceLandmark[1];
+                int newTop = newFaceLandmark[2];
+                int newWidth = newFaceLandmark[3] - newFaceLandmark[1];
+                int newHeight = newFaceLandmark[4] - newFaceLandmark[2];
+                bitmapTemp = Bitmap.createBitmap(bitmapTemp, newLeft, newTop, newWidth, newHeight);
+                byte[] byteDataForFeatureExtract = getPixelsRGBA(bitmapTemp);
+                faceFeatures = GetFaceFeature(byteDataForFeatureExtract, bitmapTemp.getWidth(), bitmapTemp.getHeight());
+            } else {
+                bitmapTemp = Bitmap.createBitmap(imageBitmap, left, top, right-left, bottom-top);
+                byte[] byteDataForFeatureExtract = getPixelsRGBA(bitmapTemp);
+                faceFeatures = GetFaceFeature(byteDataForFeatureExtract, right-left, bottom-top);
+            }
             faceInfo.setFeature128(faceFeatures);
             faceInfos.add(faceInfo);
+        }
+        if (bitmapTemp != null && !bitmapTemp.isRecycled()) {
+            bitmapTemp.recycle();
+            bitmapTemp = null;
         }
         return faceInfos;
     }
@@ -120,6 +142,7 @@ public class Face {
         return Bitmap.createBitmap(bitmap, left, top, right-left, bottom-top);
     }
 
+    //TODO bad warp affine, change it
     private Bitmap warpAffineBitmap(Bitmap bitmap, Point leftEyePoint, Point rightEyePoint) {
         double eyeCenter_x = (leftEyePoint.x + rightEyePoint.x) * 0.5;
         double eyeCenter_y = (leftEyePoint.y + rightEyePoint.y) * 0.5;
@@ -157,6 +180,35 @@ public class Face {
             mod2 += feature2[index] * feature2[index];
         }
         return ret / Math.sqrt(mod1) / Math.sqrt(mod2);
+    }
+
+    private static void copyModelFileFromAssetsToSD(Context context, String strOutFileName) throws IOException {
+//        Log.i(TAG, "start copy file " + strOutFileName);
+        String modelBaseDir = Environment.getExternalStorageDirectory().getPath() + File.separator + "faceDetAndRecModel" + File.separator;
+        File file = new File(modelBaseDir);
+        if (!file.exists()) {
+            file.mkdir();
+        }
+
+        String tmpFile = modelBaseDir + strOutFileName;
+        File f = new File(tmpFile);
+        if (f.exists()) {
+            Log.i(TAG, "file exists " + strOutFileName);
+            return;
+        }
+        InputStream myInput;
+        java.io.OutputStream myOutput = new FileOutputStream(modelBaseDir + strOutFileName);
+        myInput = context.getAssets().open(strOutFileName);
+        byte[] buffer = new byte[1024];
+        int length = myInput.read(buffer);
+        while (length > 0) {
+            myOutput.write(buffer, 0, length);
+            length = myInput.read(buffer);
+        }
+        myOutput.flush();
+        myInput.close();
+        myOutput.close();
+//        Log.i(TAG, "end copy file " + strOutFileName);
     }
 
     //============================== JNI =======================================

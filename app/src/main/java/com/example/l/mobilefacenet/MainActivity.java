@@ -81,22 +81,21 @@ public class MainActivity extends AppCompatActivity {
         verifyStoragePermissions(this);
 
         try {
-            copyBigDataToSD("det1.bin");
-            copyBigDataToSD("det2.bin");
-            copyBigDataToSD("det3.bin");
-            copyBigDataToSD("det1.param");
-            copyBigDataToSD("det2.param");
-            copyBigDataToSD("det3.param");
-            copyBigDataToSD("recognition.bin");
-            copyBigDataToSD("recognition.param");
+            copyModelFileFromAssetsToSD("det1.bin");
+            copyModelFileFromAssetsToSD("det2.bin");
+            copyModelFileFromAssetsToSD("det3.bin");
+            copyModelFileFromAssetsToSD("det1.param");
+            copyModelFileFromAssetsToSD("det2.param");
+            copyModelFileFromAssetsToSD("det3.param");
+            copyModelFileFromAssetsToSD("recognition.bin");
+            copyModelFileFromAssetsToSD("recognition.param");
         } catch (IOException e) {
             e.printStackTrace();
         }
         //model init
-        File sdDir = Environment.getExternalStorageDirectory();//get directory
-        String sdPath = sdDir.toString() + "/facem/";
+        String modelBaseDir = Environment.getExternalStorageDirectory().getPath() + File.separator + "faceDetAndRecModel" + File.separator;
 //        mFace.FaceModelInit(sdPath);
-        mFace.init(sdPath);
+        mFace.init(modelBaseDir);
 
         //LEFT IMAGE
         imageView1 = (ImageView) findViewById(R.id.imageView1);
@@ -124,45 +123,44 @@ public class MainActivity extends AppCompatActivity {
                 byte[] imageData = getPixelsRGBA(yourSelectedImage1);
 
                 long timeDetectFace = System.currentTimeMillis();
-                int faceInfo[] = mFace.FaceDetect(imageData, width, height, 4);
+                ArrayList<Face.FaceInfo> faceInfos1 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage1);
                 timeDetectFace = System.currentTimeMillis() - timeDetectFace;
 
-                if (faceInfo.length > 1) {
+                if (faceInfos1.size() > 0) {
                     faceInfo1.setText("pic1 detect time:" + timeDetectFace);
-                    int faceNum = faceInfo[0];
+                    int faceNum = faceInfos1.size();
                     Log.i(TAG, "pic width：" + width + "height：" + height + " face num：" + faceNum);
                     Bitmap drawBitmap = yourSelectedImage1.copy(Bitmap.Config.ARGB_8888, true);
                     int left = 0, top = 0, right = 0, bottom = 0;
-                    for (int i = 0; i < faceInfo[0]; i++) {
-                        Canvas canvas = new Canvas(drawBitmap);
-                        Paint paint = new Paint();
-                        left = faceInfo[1 + 14 * i];
-                        top = faceInfo[2 + 14 * i];
-                        right = faceInfo[3 + 14 * i];
-                        bottom = faceInfo[4 + 14 * i];
-                        paint.setColor(Color.BLUE);
-                        paint.setStyle(Paint.Style.STROKE);
-                        paint.setStrokeWidth(5);
-                        canvas.drawRect(left, top, right, bottom, paint);
-                    }
+                    Face.FaceInfo faceInfo = faceInfos1.get(0);
+                    Canvas canvas = new Canvas(drawBitmap);
+                    Paint paint = new Paint();
+                    left = faceInfo.faceRect.left;
+                    top = faceInfo.faceRect.top;
+                    right = faceInfo.faceRect.right;
+                    bottom = faceInfo.faceRect.bottom;
+                    paint.setColor(Color.BLUE);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(5);
+                    canvas.drawRect(left, top, right, bottom, paint);
                     imageView1.setImageBitmap(drawBitmap);
 
-                    int widthEnlarge = (int)((faceInfo[3] - faceInfo[1]) / 3);
-                    int heightEnlarge = (int)((faceInfo[4] - faceInfo[2]) / 3);
-                    left = (faceInfo[1] > widthEnlarge) ? (faceInfo[1] - widthEnlarge) : 0;
-                    top = (faceInfo[2] > heightEnlarge) ? (faceInfo[2] - heightEnlarge) : 0;
-                    right = ((faceInfo[3] + widthEnlarge) < width) ? (faceInfo[3] + widthEnlarge) : width;
-                    bottom = ((faceInfo[4] + heightEnlarge) < height) ? (faceInfo[4] + heightEnlarge) : height;
+//                    int widthEnlarge = (int)((faceInfo[3] - faceInfo[1]) / 3);
+//                    int heightEnlarge = (int)((faceInfo[4] - faceInfo[2]) / 3);
+//                    left = (faceInfo[1] > widthEnlarge) ? (faceInfo[1] - widthEnlarge) : 0;
+//                    top = (faceInfo[2] > heightEnlarge) ? (faceInfo[2] - heightEnlarge) : 0;
+//                    right = ((faceInfo[3] + widthEnlarge) < width) ? (faceInfo[3] + widthEnlarge) : width;
+//                    bottom = ((faceInfo[4] + heightEnlarge) < height) ? (faceInfo[4] + heightEnlarge) : height;
+//
+//                    faceImage1 = Bitmap.createBitmap(yourSelectedImage1, left, top, right - left, bottom - top);
+//                    faceImage1 = getWarpAffineBitmap(faceImage1, new Point(faceInfo[5], faceInfo[10]), new Point(faceInfo[6], faceInfo[11]));
+//                    faceData1 = getPixelsRGBA(faceImage1);
+//                    int[] faceInfo3 = mFace.FaceDetect(faceData1, right - left, bottom - top, 4);
+//                    faceImage1 = Bitmap.createBitmap(faceImage1, faceInfo3[1], faceInfo3[2], faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
+//                    faceData1 = getPixelsRGBA(faceImage1);
+//                    feature1 = mFace.GetFaceFeature(faceData1, faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
 
-                    faceImage1 = Bitmap.createBitmap(yourSelectedImage1, left, top, right - left, bottom - top);
-                    faceImage1 = getWarpAffineBitmap(faceImage1, new Point(faceInfo[5], faceInfo[10]), new Point(faceInfo[6], faceInfo[11]));
-                    faceData1 = getPixelsRGBA(faceImage1);
-                    int[] faceInfo3 = mFace.FaceDetect(faceData1, right - left, bottom - top, 4);
-                    faceImage1 = Bitmap.createBitmap(faceImage1, faceInfo3[1], faceInfo3[2], faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
-                    faceData1 = getPixelsRGBA(faceImage1);
-                    feature1 = mFace.GetFaceFeature(faceData1, faceInfo3[3] - faceInfo3[1], faceInfo3[4] - faceInfo3[2]);
-//                    ArrayList<Face.FaceInfo> faceInfos1 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage1);
-//                    feature1 = faceInfos1.get(0).feature128;
+                    feature1 = faceInfos1.get(0).feature128;
                 } else {
                     faceInfo1.setText("no face");
                 }
@@ -204,53 +202,50 @@ public class MainActivity extends AppCompatActivity {
                 byte[] imageDate = getPixelsRGBA(yourSelectedImage2);
 
                 long timeDetectFace = System.currentTimeMillis();
-                int faceInfo[] = mFace.FaceDetect(imageDate, width, height, 4);
+                ArrayList<Face.FaceInfo> faceInfos2 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage2);
                 timeDetectFace = System.currentTimeMillis() - timeDetectFace;
 
-                if (faceInfo.length > 1) {
+                if (faceInfos2.size() > 0) {
                     faceInfo2.setText("pic2 detect time:" + timeDetectFace);
-                    int faceNum = faceInfo[0];
+                    int faceNum = faceInfos2.size();
                     Log.i(TAG, "pic width：" + width + "height：" + height + " face num：" + faceNum);
                     Bitmap drawBitmap = yourSelectedImage2.copy(Bitmap.Config.ARGB_8888, true);
-
-                    ArrayList<Face.FaceInfo> faceInfos2 = mFace.detectFaceAndGetFeatureFrom(yourSelectedImage2);
-
-                    for (int i = 0; i < faceInfo[0]; i++) {
+                    for (Face.FaceInfo faceInfo3 : faceInfos2) {
                         int left_, top_, right_, bottom_;
                         Canvas canvas = new Canvas(drawBitmap);
                         Paint paint = new Paint();
-                        left_ = faceInfo[1 + 14 * i];
-                        top_ = faceInfo[2 + 14 * i];
-                        right_ = faceInfo[3 + 14 * i];
-                        bottom_ = faceInfo[4 + 14 * i];
+                        left_ = faceInfo3.faceRect.left;
+                        top_ = faceInfo3.faceRect.top;
+                        right_ = faceInfo3.faceRect.right;
+                        bottom_ = faceInfo3.faceRect.bottom;
                         paint.setColor(Color.GREEN);
                         paint.setStyle(Paint.Style.STROKE);
                         paint.setStrokeWidth(3);
                         paint.setTextSize(25);
                         canvas.drawRect(left_, top_, right_, bottom_, paint);
 
-                        int widthEnlarge = (int)((faceInfo[3 + 14 * i] - faceInfo[1 + 14 * i]) / 3);
-                        int heightEnlarge = (int)((faceInfo[4 + 14 * i] - faceInfo[2 + 14 * i]) / 3);
-                        left_ = (faceInfo[1 + 14 * i] > widthEnlarge) ? (faceInfo[1 + 14 * i] - widthEnlarge) : 0;
-                        top_ = (faceInfo[2 + 14 * i] > heightEnlarge) ? (faceInfo[2 + 14 * i] - heightEnlarge) : 0;
-                        right_ = ((faceInfo[3 + 14 * i] + widthEnlarge) < width) ? (faceInfo[3 + 14 * i] + widthEnlarge) : width;
-                        bottom_ = ((faceInfo[4 + 14 * i] + heightEnlarge) < height) ? (faceInfo[4 + 14 * i] + heightEnlarge) : height;
-
-                        faceImage2 = Bitmap.createBitmap(yourSelectedImage2, left_, top_, right_ - left_, bottom_ - top_);
-                        faceImage2 = getWarpAffineBitmap(faceImage2, new Point(faceInfo[5+14*i]-left_, faceInfo[10+14*i]-top_), new Point(faceInfo[6+14*i]-left_, faceInfo[11+14*i]-top_));
-                        faceData2 = getPixelsRGBA(faceImage2);
-                        int[] faceInfo4 = mFace.FaceDetect(faceData2, right_ - left_, bottom_ - top_, 4);
-                        if (faceInfo4.length == 1) {
-                            continue;
-                        }
-                        faceImage2 = Bitmap.createBitmap(faceImage2, faceInfo4[1], faceInfo4[2],
-                                faceInfo4[3] - faceInfo4[1], faceInfo4[4] - faceInfo4[2]);
-                        faceData2 = getPixelsRGBA(faceImage2);
-                        feature2 = mFace.GetFaceFeature(faceData2, faceInfo4[3] - faceInfo4[1], faceInfo4[4] - faceInfo4[2]);
+//                        int widthEnlarge = (int)((faceInfo[3 + 14 * i] - faceInfo[1 + 14 * i]) / 3);
+//                        int heightEnlarge = (int)((faceInfo[4 + 14 * i] - faceInfo[2 + 14 * i]) / 3);
+//                        left_ = (faceInfo[1 + 14 * i] > widthEnlarge) ? (faceInfo[1 + 14 * i] - widthEnlarge) : 0;
+//                        top_ = (faceInfo[2 + 14 * i] > heightEnlarge) ? (faceInfo[2 + 14 * i] - heightEnlarge) : 0;
+//                        right_ = ((faceInfo[3 + 14 * i] + widthEnlarge) < width) ? (faceInfo[3 + 14 * i] + widthEnlarge) : width;
+//                        bottom_ = ((faceInfo[4 + 14 * i] + heightEnlarge) < height) ? (faceInfo[4 + 14 * i] + heightEnlarge) : height;
+//
+//                        faceImage2 = Bitmap.createBitmap(yourSelectedImage2, left_, top_, right_ - left_, bottom_ - top_);
+//                        faceImage2 = getWarpAffineBitmap(faceImage2, new Point(faceInfo[5+14*i]-left_, faceInfo[10+14*i]-top_), new Point(faceInfo[6+14*i]-left_, faceInfo[11+14*i]-top_));
+//                        faceData2 = getPixelsRGBA(faceImage2);
+//                        int[] faceInfo4 = mFace.FaceDetect(faceData2, right_ - left_, bottom_ - top_, 4);
+//                        if (faceInfo4.length == 1) {
+//                            continue;
+//                        }
+//                        faceImage2 = Bitmap.createBitmap(faceImage2, faceInfo4[1], faceInfo4[2],
+//                                faceInfo4[3] - faceInfo4[1], faceInfo4[4] - faceInfo4[2]);
+//                        faceData2 = getPixelsRGBA(faceImage2);
+//                        feature2 = mFace.GetFaceFeature(faceData2, faceInfo4[3] - faceInfo4[1], faceInfo4[4] - faceInfo4[2]);
 
 //                        double similar = mFace.FaceRecognize(faceData1, faceImage1.getWidth(), faceImage1.getHeight(),
 //                                faceData2, faceImage2.getWidth(), faceImage2.getHeight());
-//                        feature2 = faceInfos2.get(i).feature128;
+                        feature2 = faceInfo3.feature128;
                         double similar = mFace.calSimilarityByFeature(feature1, feature2);
                         canvas.drawText(Double.toString(similar), left_, top_ - 5, paint);
                     }
@@ -351,22 +346,22 @@ public class MainActivity extends AppCompatActivity {
         return temp;
     }
 
-    private void copyBigDataToSD(String strOutFileName) throws IOException {
+    private void copyModelFileFromAssetsToSD(String strOutFileName) throws IOException {
         Log.i(TAG, "start copy file " + strOutFileName);
-        File sdDir = Environment.getExternalStorageDirectory();//get directory
-        File file = new File(sdDir.toString() + "/facem/");
+        String modelBaseDir = Environment.getExternalStorageDirectory().getPath() + File.separator + "faceDetAndRecModel" + File.separator;
+        File file = new File(modelBaseDir);
         if (!file.exists()) {
             file.mkdir();
         }
 
-        String tmpFile = sdDir.toString() + "/facem/" + strOutFileName;
+        String tmpFile = modelBaseDir + strOutFileName;
         File f = new File(tmpFile);
         if (f.exists()) {
             Log.i(TAG, "file exists " + strOutFileName);
             return;
         }
         InputStream myInput;
-        java.io.OutputStream myOutput = new FileOutputStream(sdDir.toString() + "/facem/" + strOutFileName);
+        java.io.OutputStream myOutput = new FileOutputStream(modelBaseDir + strOutFileName);
         myInput = this.getAssets().open(strOutFileName);
         byte[] buffer = new byte[1024];
         int length = myInput.read(buffer);
